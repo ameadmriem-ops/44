@@ -217,6 +217,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        try {
+            webView.onResume()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error resuming webView: ${e.message}")
+        }
         applyImmersiveFullScreen()
         if (isWebViewLoaded) {
             val sysGranted = isSystemNotificationsAllowed()
@@ -421,6 +426,7 @@ class MainActivity : ComponentActivity() {
             setBackgroundColor(Color.BLACK)
             isFocusable = true
             isFocusableInTouchMode = true
+            setLayerType(View.LAYER_TYPE_HARDWARE, null)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
             }
@@ -435,6 +441,9 @@ class MainActivity : ComponentActivity() {
                 useWideViewPort = true
                 loadWithOverviewMode = true
                 cacheMode = WebSettings.LOAD_DEFAULT
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    offscreenPreRaster = true
+                }
                 setSupportMultipleWindows(true)
                 try {
                     val currentUa = userAgentString
@@ -1225,6 +1234,11 @@ class MainActivity : ComponentActivity() {
         super.onPause()
         stopPlaybackTicker()
         exoPlayer?.pause()
+        try {
+            webView.onPause()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error pausing webView: ${e.message}")
+        }
     }
 
     override fun onDestroy() {

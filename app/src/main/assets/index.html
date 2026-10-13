@@ -2820,6 +2820,75 @@ body.light-mode .account-stat-val {
   opacity: 1;
 }
 
+/* ================= Progressive Rendering & Poster Placeholders ================= */
+.poster-wrapper {
+  position: relative !important;
+  background: #141414 !important;
+  aspect-ratio: 2 / 3 !important;
+  overflow: hidden !important;
+}
+.poster-placeholder-skeleton {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #161619 0%, #252530 50%, #161619 100%);
+  background-size: 200% 200%;
+  animation: posterShimmerAnim 1.6s ease-in-out infinite;
+  z-index: 1;
+  pointer-events: none;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+.poster-placeholder-skeleton.hidden {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+@keyframes posterShimmerAnim {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.poster-placeholder-icon {
+  font-size: 28px;
+  opacity: 0.4;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+.poster-placeholder-text {
+  font-size: 10px;
+  color: #888;
+  font-weight: 700;
+  margin-top: 4px;
+}
+img.poster, .home-card-poster-wrap img {
+  opacity: 0;
+  transition: opacity 0.32s ease-in-out, transform 0.25s ease !important;
+  will-change: opacity;
+}
+img.poster.loaded, .home-card-poster-wrap img.loaded {
+  opacity: 1 !important;
+}
+img.poster.fallback-applied, .home-card-poster-wrap img.fallback-applied {
+  opacity: 0.95 !important;
+  object-fit: cover !important;
+}
+
+/* Progressive Movie Card Insertion Animation */
+.movie-card.progressive-item-enter, .home-content-card.progressive-item-enter {
+  animation: cardEnterAnim 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes cardEnterAnim {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
 </style>
 <script type="importmap">{"imports":{"firebase/app":"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js","firebase/firestore":"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js","firebase/auth":"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js"}}</script>
 </head>
@@ -6607,56 +6676,339 @@ window.renderCharactersPage = function() {
   `;
 };
 
-const q=query(colRef,orderBy("createdAt","desc"),limit(500));
-onSnapshot(q,(s)=>{
-  window.allContent=s.docs.map(d=>{
-    const data = d.data() || {};
-    let alts = [];
-    if (Array.isArray(data.alternativeTitles)) {
-      alts = data.alternativeTitles.map(x => String(x || "").trim()).filter(Boolean);
-    } else if (typeof data.alternativeTitles === "string" && data.alternativeTitles.trim()) {
-      alts = data.alternativeTitles.split(/[,،\n]+/).map(x => x.trim()).filter(Boolean);
-    }
-    let genres = [];
-    if (Array.isArray(data.genres)) {
-      genres = data.genres.map(x => String(x || "").trim()).filter(Boolean);
-    } else if (typeof data.genres === "string" && data.genres.trim()) {
-      genres = data.genres.split(/[,،\n]+/).map(x => x.trim()).filter(Boolean);
-    }
-    return {
-      firebaseId: d.id,
-      ...data,
-      ratingAverage: (data.ratingAverage !== undefined && data.ratingAverage !== null) ? Number(data.ratingAverage) : 0,
-      ratingCount: (data.ratingCount !== undefined && data.ratingCount !== null) ? Number(data.ratingCount) : 0,
-      ratingSum: (data.ratingSum !== undefined && data.ratingSum !== null) ? Number(data.ratingSum) : 0,
-      genres: genres,
-      version: (data.version || "").trim(),
-      trailerUrl: (data.trailerUrl || data.trailer || "").trim(),
-      alternativeTitles: alts
-    };
-  });
-  if (window._pendingFcmNotification) {
-    const pending = window._pendingFcmNotification;
-    window._pendingFcmNotification = null;
-    setTimeout(() => {
-      window.handleFcmNotification(pending);
-    }, 120);
+// ================= Progressive Image Loader & Poster Cache Manager =================
+window.posterCache = window.posterCache || new Set();
+window._activePosterLoads = 0;
+window._maxConcurrentPosterLoads = 5;
+window._posterLoadQueue = [];
+
+window.enqueuePosterLoad = function(img) {
+  if (!img) return;
+  const targetSrc = img.getAttribute("data-src") || img.src;
+  if (!targetSrc) return;
+
+  if (window.posterCache.has(targetSrc)) {
+    if (img.src !== targetSrc) img.src = targetSrc;
+    img.classList.add("loaded");
+    const ph = img.parentElement ? img.parentElement.querySelector(".poster-placeholder-skeleton") : null;
+    if (ph) ph.classList.add("hidden");
+    return;
   }
-  if (currentPage === "details" && window._lastDetailsFid && window.updateDetailsRatingDisplay) {
-    const currItem = getItemByFirebaseId(window._lastDetailsFid);
-    if (currItem) {
-      const userScore = (window.userRatings && window.userRatings[currItem.firebaseId]) || null;
-      window.updateDetailsRatingDisplay(currItem.firebaseId, currItem.ratingAverage, currItem.ratingCount, userScore);
-    }
+
+  if (!window._posterLoadQueue.includes(img)) {
+    window._posterLoadQueue.push(img);
   }
-  if (window.currentUserRole) {
-    if (window.isTypingOrInputActive && window.isTypingOrInputActive()) {
-      window._pendingPageReRenderOnBlur = true;
+  window.processPosterQueue();
+};
+
+window.processPosterQueue = function() {
+  while (window._activePosterLoads < window._maxConcurrentPosterLoads && window._posterLoadQueue.length > 0) {
+    const img = window._posterLoadQueue.shift();
+    if (!img) continue;
+    const targetSrc = img.getAttribute("data-src");
+    if (!targetSrc) continue;
+
+    window._activePosterLoads++;
+    img.src = targetSrc;
+  }
+};
+
+window.onPosterLoaded = function(img) {
+  if (!img) return;
+  img.classList.add("loaded");
+  const targetSrc = img.getAttribute("data-src") || img.src;
+  if (targetSrc) window.posterCache.add(targetSrc);
+
+  const ph = img.parentElement ? img.parentElement.querySelector(".poster-placeholder-skeleton") : null;
+  if (ph) ph.classList.add("hidden");
+
+  window._activePosterLoads = Math.max(0, window._activePosterLoads - 1);
+  window.processPosterQueue();
+};
+
+window.onPosterError = function(img) {
+  if (!img) return;
+  window._activePosterLoads = Math.max(0, window._activePosterLoads - 1);
+  window.processPosterQueue();
+
+  const fallbackSvg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='450' viewBox='0 0 300 450'><rect width='100%' height='100%' fill='%23141419'/><rect x='10' y='10' width='280' height='430' rx='12' fill='%231b1b22' stroke='%23333340' stroke-width='2'/><circle cx='150' cy='200' r='48' fill='%23252530'/><text x='150' y='215' font-size='42' text-anchor='middle' fill='%23666677'>🎬</text><text x='150' y='275' font-family='sans-serif' font-size='14' font-weight='bold' text-anchor='middle' fill='%23888899'>عالم الأنمي</text></svg>";
+
+  img.onerror = null;
+  img.src = fallbackSvg;
+  img.classList.add("loaded", "fallback-applied");
+  const ph = img.parentElement ? img.parentElement.querySelector(".poster-placeholder-skeleton") : null;
+  if (ph) ph.classList.add("hidden");
+};
+
+window.initPosterObserver = function() {
+  if (window._posterObserver) return;
+  if (typeof IntersectionObserver !== "undefined") {
+    window._posterObserver = new IntersectionObserver((entries, observer) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const img = entry.target;
+          observer.unobserve(img);
+          window.enqueuePosterLoad(img);
+        }
+      });
+    }, { rootMargin: "250px 0px" });
+  }
+};
+window.initPosterObserver();
+
+// ================= Progressive Document Parsing & Ordering =================
+window.parseMovieDoc = function(d) {
+  const data = d.data() || {};
+  let alts = [];
+  if (Array.isArray(data.alternativeTitles)) {
+    alts = data.alternativeTitles.map(x => String(x || "").trim()).filter(Boolean);
+  } else if (typeof data.alternativeTitles === "string" && data.alternativeTitles.trim()) {
+    alts = data.alternativeTitles.split(/[,،\n]+/).map(x => x.trim()).filter(Boolean);
+  }
+  let genres = [];
+  if (Array.isArray(data.genres)) {
+    genres = data.genres.map(x => String(x || "").trim()).filter(Boolean);
+  } else if (typeof data.genres === "string" && data.genres.trim()) {
+    genres = data.genres.split(/[,،\n]+/).map(x => x.trim()).filter(Boolean);
+  }
+  const orderVal = (data.order !== undefined && data.order !== null)
+    ? Number(data.order)
+    : ((data.sortOrder !== undefined && data.sortOrder !== null) ? Number(data.sortOrder) : undefined);
+
+  return {
+    firebaseId: d.id,
+    ...data,
+    order: orderVal,
+    ratingAverage: (data.ratingAverage !== undefined && data.ratingAverage !== null) ? Number(data.ratingAverage) : 0,
+    ratingCount: (data.ratingCount !== undefined && data.ratingCount !== null) ? Number(data.ratingCount) : 0,
+    ratingSum: (data.ratingSum !== undefined && data.ratingSum !== null) ? Number(data.ratingSum) : 0,
+    genres: genres,
+    version: (data.version || "").trim(),
+    trailerUrl: (data.trailerUrl || data.trailer || "").trim(),
+    alternativeTitles: alts
+  };
+};
+
+window.compareMoviesOrder = function(a, b) {
+  if (a.order !== undefined && b.order !== undefined && !isNaN(a.order) && !isNaN(b.order)) {
+    if (a.order !== b.order) return a.order - b.order;
+  }
+  const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAtMs || (typeof a.createdAt === 'number' ? a.createdAt : 0));
+  const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAtMs || (typeof b.createdAt === 'number' ? b.createdAt : 0));
+  if (timeB !== timeA) return timeB - timeA;
+  return String(b.firebaseId || b.id || "").localeCompare(String(a.firebaseId || a.id || ""));
+};
+
+// Offline cache quick-load
+try {
+  const cachedStr = localStorage.getItem("movies_offline_cache");
+  if (cachedStr && (!window.allContent || window.allContent.length === 0)) {
+    window.allContent = JSON.parse(cachedStr);
+  }
+} catch(e) {}
+
+// ================= Progressive DOM Grid Helpers =================
+window.createCardElement = function(item) {
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = window.createCard(item).trim();
+  const el = wrapper.firstElementChild;
+  const img = el ? el.querySelector("img.poster") : null;
+  if (img) {
+    if (window._posterObserver) {
+      window._posterObserver.observe(img);
     } else {
-      renderCurrentPage();
+      window.enqueuePosterLoad(img);
     }
   }
-});
+  return el;
+};
+
+window.updateCardElement = function(cardEl, item) {
+  if (!cardEl || !item) return;
+  const h3 = cardEl.querySelector("h3");
+  if (h3 && h3.textContent !== (item.title || "")) {
+    h3.textContent = item.title || "";
+    h3.title = item.title || "";
+  }
+  const img = cardEl.querySelector("img.poster");
+  const newPoster = (item.poster || "").trim();
+  if (img && img.getAttribute("data-src") !== newPoster) {
+    img.setAttribute("data-src", newPoster);
+    const ph = cardEl.querySelector(".poster-placeholder-skeleton");
+    if (ph) ph.classList.remove("hidden");
+    img.classList.remove("loaded", "fallback-applied");
+    if (window._posterObserver) {
+      window._posterObserver.observe(img);
+    } else {
+      window.enqueuePosterLoad(img);
+    }
+  }
+  const posterWrap = cardEl.querySelector(".poster-wrapper");
+  if (posterWrap) {
+    let ratingBadge = posterWrap.querySelector(".poster-rating-badge");
+    const avg = Number(item.ratingAverage) || 0;
+    if (avg > 0) {
+      if (!ratingBadge) {
+        ratingBadge = document.createElement("span");
+        ratingBadge.className = "poster-rating-badge";
+        posterWrap.appendChild(ratingBadge);
+      }
+      ratingBadge.textContent = `⭐ ${avg.toFixed(1)}`;
+    } else if (ratingBadge) {
+      ratingBadge.remove();
+    }
+  }
+};
+
+window.progressiveRenderItemIntoGrid = function(grid, item) {
+  if (!grid || !item) return;
+
+  const emptyPlaceholder = grid.querySelector(".grid-empty-state, .grid-loading-shimmer");
+  if (emptyPlaceholder) emptyPlaceholder.remove();
+
+  const existing = grid.querySelector(`[data-card-fid="${item.firebaseId}"]`);
+  if (existing) {
+    window.updateCardElement(existing, item);
+    return;
+  }
+
+  const cardEl = window.createCardElement(item);
+  if (!cardEl) return;
+
+  const children = Array.from(grid.children).filter(c => c.getAttribute("data-card-fid"));
+  let inserted = false;
+
+  for (let i = 0; i < children.length; i++) {
+    const childFid = children[i].getAttribute("data-card-fid");
+    const childItem = window.getItemByFirebaseId(childFid);
+    if (childItem && window.compareMoviesOrder(item, childItem) < 0) {
+      grid.insertBefore(cardEl, children[i]);
+      inserted = true;
+      break;
+    }
+  }
+
+  if (!inserted) {
+    grid.appendChild(cardEl);
+  }
+};
+
+// ================= Optimized Firestore Listener with docChanges() =================
+window.moviesUnsubscribe = null;
+window._isInitialMoviesLoadComplete = false;
+
+window.setupMoviesListener = function() {
+  if (window.moviesUnsubscribe) {
+    try { window.moviesUnsubscribe(); } catch(e) {}
+    window.moviesUnsubscribe = null;
+  }
+
+  const q = query(colRef, orderBy("createdAt", "desc"), limit(500));
+
+  const handleSnapshot = (s) => {
+    const changes = s.docChanges();
+
+    if (!window._isInitialMoviesLoadComplete) {
+      // 1. Initial snapshot arrival: Progressive rendering of movie cards
+      window._isInitialMoviesLoadComplete = true;
+      const parsedItems = s.docs.map(window.parseMovieDoc);
+      parsedItems.sort(window.compareMoviesOrder);
+      window.allContent = parsedItems;
+
+      try {
+        localStorage.setItem("movies_offline_cache", JSON.stringify(parsedItems.slice(0, 100)));
+      } catch(e) {}
+
+      // Handle FCM if pending
+      if (window._pendingFcmNotification) {
+        const pending = window._pendingFcmNotification;
+        window._pendingFcmNotification = null;
+        setTimeout(() => {
+          window.handleFcmNotification(pending);
+        }, 120);
+      }
+
+      // If active screen is category or home, stream cards progressively
+      const targetGrid = document.getElementById("categoryCardsGrid") || document.getElementById("homeExploreGrid");
+      if (targetGrid) {
+        targetGrid.innerHTML = "";
+        let streamIdx = 0;
+        function streamNextBatch() {
+          const batchSize = 3;
+          const end = Math.min(streamIdx + batchSize, window.allContent.length);
+          for (let i = streamIdx; i < end; i++) {
+            const item = window.allContent[i];
+            window.progressiveRenderItemIntoGrid(targetGrid, item);
+          }
+          streamIdx = end;
+          if (streamIdx < window.allContent.length) {
+            requestAnimationFrame(streamNextBatch);
+          }
+        }
+        streamNextBatch();
+      } else {
+        renderCurrentPage();
+      }
+      return;
+    }
+
+    // 2. Differential updates (docChanges) for subsequent snapshot events
+    changes.forEach(change => {
+      const parsed = window.parseMovieDoc(change.doc);
+
+      if (change.type === "added") {
+        const exists = window.allContent.some(x => x.firebaseId === parsed.firebaseId);
+        if (!exists) {
+          window.allContent.push(parsed);
+          window.allContent.sort(window.compareMoviesOrder);
+        }
+        const activeGrid = document.getElementById("categoryCardsGrid") || document.getElementById("homeExploreGrid");
+        if (activeGrid) {
+          window.progressiveRenderItemIntoGrid(activeGrid, parsed);
+        }
+      } else if (change.type === "modified") {
+        const idx = window.allContent.findIndex(x => x.firebaseId === parsed.firebaseId);
+        if (idx !== -1) {
+          window.allContent[idx] = parsed;
+          window.allContent.sort(window.compareMoviesOrder);
+        }
+        // Update all DOM instances of this movie on the page without full re-render
+        document.querySelectorAll(`[data-card-fid="${parsed.firebaseId}"]`).forEach(card => {
+          window.updateCardElement(card, parsed);
+        });
+        if (currentPage === "details" && window._lastDetailsFid === parsed.firebaseId && window.updateDetailsRatingDisplay) {
+          const userScore = (window.userRatings && window.userRatings[parsed.firebaseId]) || null;
+          window.updateDetailsRatingDisplay(parsed.firebaseId, parsed.ratingAverage, parsed.ratingCount, userScore);
+        }
+      } else if (change.type === "removed") {
+        window.allContent = window.allContent.filter(x => x.firebaseId !== parsed.firebaseId);
+        document.querySelectorAll(`[data-card-fid="${parsed.firebaseId}"]`).forEach(card => {
+          card.style.transition = "all 0.25s ease";
+          card.style.opacity = "0";
+          card.style.transform = "scale(0.9)";
+          setTimeout(() => card.remove(), 250);
+        });
+      }
+    });
+  };
+
+  const handleError = (err) => {
+    console.warn("Movies snapshot error, trying fallback without orderBy:", err);
+    try {
+      const fallbackQ = query(colRef, limit(500));
+      window.moviesUnsubscribe = onSnapshot(fallbackQ, handleSnapshot, (err2) => {
+        console.error("Critical fallback movies listener error:", err2);
+      });
+    } catch(e) {
+      console.error("Error setting fallback listener:", e);
+    }
+  };
+
+  window.moviesUnsubscribe = onSnapshot(q, handleSnapshot, handleError);
+};
+
+// Initialize movies listener
+window.setupMoviesListener();
 
 window.getItemByFirebaseId=(fid)=>window.allContent.find(i=>i.firebaseId===fid);
 window.isFavorite=(id)=>window.favorites.includes(id);
@@ -6674,7 +7026,6 @@ window.setActiveNav=(p)=>{
     if(n) n.classList.add("active");
   }
 
-  // Update active item in side drawer
   document.querySelectorAll(".drawer-item").forEach(item => {
     if (item.getAttribute("data-page") === p) {
       item.classList.add("active");
@@ -6683,6 +7034,7 @@ window.setActiveNav=(p)=>{
     }
   });
 };
+
 window.createCard = (item) => {
   if (!item) return "";
   let fav = window.isFavorite ? window.isFavorite(item.id) : false;
@@ -6703,7 +7055,6 @@ window.createCard = (item) => {
   let isAnimation = item.type === "animation" || item.type === "arabic" || item.type === "sports";
   let cat = (item.category || "").trim();
 
-  // Determine red pill badge text exactly matching reference image (الفيلم / مسلسل / الأنميشن / مترجم)
   let redBadge = "مسلسل";
   let metaCategory = "مسلسل";
   if (cat === "فلم" || cat === "فيلم") {
@@ -6720,7 +7071,6 @@ window.createCard = (item) => {
     metaCategory = "أنمي";
   }
 
-  // Version status (مترجم / مدبلج)
   let version = (window.getItemVersion ? window.getItemVersion(item) : (item.version || "")).trim();
   let versionBadgeHtml = "";
   if (version && version !== redBadge) {
@@ -6729,13 +7079,27 @@ window.createCard = (item) => {
 
   let year = item.year || 2024;
   let metaText = `${year} • ${metaCategory}`;
+  let posterUrl = (item.poster || "https://images.unsplash.com/photo-1536240478700-b869070f9279?w=400").trim();
+  let isCached = window.posterCache && window.posterCache.has(posterUrl);
 
   return `
-    <div class="movie-card" tabindex="0" onclick="${click}">
+    <div class="movie-card progressive-item-enter" data-card-fid="${item.firebaseId}" tabindex="0" onclick="${click}">
       <div class="poster-wrapper">
         <button tabindex="0" class="favorite-btn ${fav ? "active" : ""}" style="position:absolute;top:6px;left:6px;z-index:3;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;color:${fav ? '#e50914' : '#fff'};font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center" onclick="event.stopPropagation();toggleFavorite('${item.id}')" title="المفضلة">♥</button>
         ${del}
-        <img class="poster" data-poster-fid="${item.firebaseId}" src="${item.poster || 'https://images.unsplash.com/photo-1536240478700-b869070f9279?w=400'}" alt="${window.escapeDescHtml(item.title || '')}" loading="lazy" decoding="async">
+        <div class="poster-placeholder-skeleton ${isCached ? 'hidden' : ''}">
+          <span class="poster-placeholder-icon">🎬</span>
+          <span class="poster-placeholder-text">جاري تحميل البوستر...</span>
+        </div>
+        <img class="poster ${isCached ? 'loaded' : ''}" 
+             data-poster-fid="${item.firebaseId}" 
+             data-src="${posterUrl}" 
+             src="${isCached ? posterUrl : 'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'15\'></svg>'}" 
+             alt="${window.escapeDescHtml(item.title || '')}" 
+             loading="lazy" 
+             decoding="async" 
+             onload="window.onPosterLoaded(this)" 
+             onerror="window.onPosterError(this)">
         <span class="poster-red-badge">${window.escapeDescHtml(redBadge)}</span>
         ${versionBadgeHtml}
         ${window.getItemRatingBadgeHtml(item)}
@@ -6882,10 +7246,15 @@ window.renderHome = () => {
     const epBadge = lastEp ? (lastEp.title || `حلقة ${lastEpIdx + 1}`) : `حلقة ${item.episodes.length}`;
     let isAnimation = item.type === "animation" || item.type === "arabic" || item.type === "sports";
     let catLabel = item.category || (isAnimation ? "أنميشن" : "مسلسل");
+    let posterUrl = (item.poster || "").trim();
+    let isCached = window.posterCache && window.posterCache.has(posterUrl);
     return `
-      <div class="home-content-card" onclick="openDetails('${item.firebaseId}')">
+      <div class="home-content-card progressive-item-enter" data-card-fid="${item.firebaseId}" onclick="openDetails('${item.firebaseId}')">
         <div class="home-card-poster-wrap">
-          <img src="${item.poster}" alt="${window.escapeDescHtml(item.title)}" loading="lazy">
+          <div class="poster-placeholder-skeleton ${isCached ? 'hidden' : ''}">
+            <span class="poster-placeholder-icon" style="font-size:20px">🎬</span>
+          </div>
+          <img class="poster ${isCached ? 'loaded' : ''}" data-poster-fid="${item.firebaseId}" data-src="${posterUrl}" src="${isCached ? posterUrl : 'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'15\'></svg>'}" alt="${window.escapeDescHtml(item.title)}" loading="lazy" decoding="async" onload="window.onPosterLoaded(this)" onerror="window.onPosterError(this)">
           <span class="home-card-badge">${window.escapeDescHtml(epBadge)}</span>
           ${window.getItemRatingBadgeHtml(item)}
         </div>
@@ -6900,10 +7269,15 @@ window.renderHome = () => {
   const latestAddedCardsHtml = latestAddedItems.map(item => {
     let isAnimation = item.type === "animation" || item.type === "arabic" || item.type === "sports";
     let catLabel = item.category || (isAnimation ? "أنميشن" : "مسلسل");
+    let posterUrl = (item.poster || "").trim();
+    let isCached = window.posterCache && window.posterCache.has(posterUrl);
     return `
-      <div class="home-content-card" onclick="openDetails('${item.firebaseId}')">
+      <div class="home-content-card progressive-item-enter" data-card-fid="${item.firebaseId}" onclick="openDetails('${item.firebaseId}')">
         <div class="home-card-poster-wrap">
-          <img src="${item.poster}" alt="${window.escapeDescHtml(item.title)}" loading="lazy">
+          <div class="poster-placeholder-skeleton ${isCached ? 'hidden' : ''}">
+            <span class="poster-placeholder-icon" style="font-size:20px">🎬</span>
+          </div>
+          <img class="poster ${isCached ? 'loaded' : ''}" data-poster-fid="${item.firebaseId}" data-src="${posterUrl}" src="${isCached ? posterUrl : 'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'15\'></svg>'}" alt="${window.escapeDescHtml(item.title)}" loading="lazy" decoding="async" onload="window.onPosterLoaded(this)" onerror="window.onPosterError(this)">
           <span class="home-card-badge" style="background:rgba(0,180,240,0.92);color:#000;font-weight:900">${item.year || 2024}</span>
           ${window.getItemRatingBadgeHtml(item)}
         </div>
@@ -6939,11 +7313,16 @@ window.renderHome = () => {
       rankBadgeStyle = "background:rgba(20,20,20,0.85);color:#fff;border:1px solid #444";
       rankText = `#${idx + 1}`;
     }
+    let posterUrl = (item.poster || "").trim();
+    let isCached = window.posterCache && window.posterCache.has(posterUrl);
 
     return `
-      <div class="home-content-card" onclick="openDetails('${item.firebaseId}')">
+      <div class="home-content-card progressive-item-enter" data-card-fid="${item.firebaseId}" onclick="openDetails('${item.firebaseId}')">
         <div class="home-card-poster-wrap">
-          <img src="${item.poster}" alt="${window.escapeDescHtml(item.title)}" loading="lazy">
+          <div class="poster-placeholder-skeleton ${isCached ? 'hidden' : ''}">
+            <span class="poster-placeholder-icon" style="font-size:20px">🎬</span>
+          </div>
+          <img class="poster ${isCached ? 'loaded' : ''}" data-poster-fid="${item.firebaseId}" data-src="${posterUrl}" src="${isCached ? posterUrl : 'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'15\'></svg>'}" alt="${window.escapeDescHtml(item.title)}" loading="lazy" decoding="async" onload="window.onPosterLoaded(this)" onerror="window.onPosterError(this)">
           <span class="home-card-rank-badge" style="${rankBadgeStyle}">${rankText}</span>
           ${window.getItemRatingBadgeHtml(item)}
         </div>
@@ -7020,7 +7399,7 @@ window.renderHome = () => {
         </div>
         <button type="button" class="home-section-more-btn" onclick="showPage('anime')">عرض المزيد ←</button>
       </div>
-      <div class="cards-grid-3">
+      <div id="homeExploreGrid" class="cards-grid-3">
         ${hourlyItems.map(createCard).join("")}
       </div>
     </div>
@@ -7066,7 +7445,7 @@ window.renderCategory=(type)=>{
     `;
   } else {
     contentGridHtml = `
-      <div class="cards-grid-3">
+      <div id="categoryCardsGrid" class="cards-grid-3">
         ${items.map(createCard).join("")}
       </div>
     `;
