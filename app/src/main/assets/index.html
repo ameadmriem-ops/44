@@ -2846,6 +2846,39 @@ body.light-mode .account-stat-val {
     </div>
   </div>
 
+  <!-- Mandatory Watch Auth Required Modal -->
+  <div id="watchAuthModalOverlay" class="auth-modal-overlay" onclick="handleWatchAuthOverlayClick(event)">
+    <div class="auth-modal-card" style="max-width:390px;text-align:center;padding:26px 20px" onclick="event.stopPropagation()">
+      <button type="button" class="auth-modal-close" onclick="closeWatchAuthPrompt()" title="إغلاق">✕</button>
+      
+      <div style="width:68px;height:68px;margin:0 auto 14px auto;border-radius:20px;background:linear-gradient(135deg,rgba(229,9,20,0.22),rgba(229,9,20,0.06));border:1px solid rgba(229,9,20,0.4);display:flex;align-items:center;justify-content:center;font-size:32px">
+        🎬
+      </div>
+
+      <h3 style="font-size:20px;font-weight:900;color:#fff;margin-bottom:8px">تسجيل الدخول مطلوب للمشاهدة</h3>
+      
+      <p id="watchAuthModalMessage" style="font-size:13.5px;color:#aaa;line-height:1.6;margin-bottom:22px">
+        لمشاهدة هذا العمل والاستمتاع بجميع الحلقات، يرجى تسجيل الدخول بحسابك أو إنشاء حساب جديد مجاناً.
+      </p>
+
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button type="button" class="auth-btn-primary" style="margin:0;font-size:15px;padding:13px;display:flex;align-items:center;justify-content:center;gap:8px" onclick="continueToAuthFromGate('login')">
+          <span>🔑</span>
+          <span>تسجيل الدخول</span>
+        </button>
+
+        <button type="button" style="background:#1f1f23;color:#fff;border:1px solid #333;padding:13px;border-radius:12px;font-size:14.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:0.2s" onclick="continueToAuthFromGate('register')">
+          <span>✨</span>
+          <span>إنشاء حساب جديد</span>
+        </button>
+
+        <button type="button" style="background:none;border:none;color:#777;font-size:12.5px;margin-top:4px;cursor:pointer;padding:6px" onclick="closeWatchAuthPrompt()">
+          تصفح لاحقاً
+        </button>
+      </div>
+    </div>
+  </div>
+
 
   <!-- Daily 5-Ads AdMob Support Dialog -->
   <div id="adDailyPopup" class="ad-overlay" style="display:none">
@@ -5366,6 +5399,84 @@ window.handleAuthOverlayClick = function(e) {
   }
 };
 
+// ================= Mandatory Watch Auth Verification & Gate System =================
+window._pendingWatchAction = null;
+
+window.isUserLoggedIn = function() {
+  if (window.firebaseAuth && window.firebaseAuth.currentUser) {
+    return true;
+  }
+  if (window.currentAuthUser && window.currentAuthUser.uid) {
+    return true;
+  }
+  return false;
+};
+
+window.showWatchAuthPrompt = function(fid, pendingAction) {
+  window._pendingWatchAction = pendingAction || { type: "episodes", fid: fid };
+  const overlay = document.getElementById("watchAuthModalOverlay");
+  const msgEl = document.getElementById("watchAuthModalMessage");
+  const item = getItemByFirebaseId(fid);
+  if (msgEl) {
+    if (item && item.title) {
+      msgEl.innerHTML = `لمشاهدة عمل <b style="color:#00d2ff">«${window.escapeDescHtml(item.title)}»</b> والاستمتاع بجميع الحلقات، يرجى تسجيل الدخول بحسابك أو إنشاء حساب جديد مجاناً.`;
+    } else {
+      msgEl.textContent = "لمشاهدة هذا العمل والاستمتاع بجميع الحلقات، يرجى تسجيل الدخول بحسابك أو إنشاء حساب جديد مجاناً.";
+    }
+  }
+  if (overlay) {
+    overlay.classList.add("active");
+  }
+};
+
+window.closeWatchAuthPrompt = function() {
+  const overlay = document.getElementById("watchAuthModalOverlay");
+  if (overlay) {
+    overlay.classList.remove("active");
+  }
+};
+
+window.handleWatchAuthOverlayClick = function(e) {
+  if (e.target && e.target.id === "watchAuthModalOverlay") {
+    window.closeWatchAuthPrompt();
+  }
+};
+
+window.continueToAuthFromGate = function(tab) {
+  window.closeWatchAuthPrompt();
+  window.openAuthModal(tab || "login");
+};
+
+window.handlePostAuthSuccess = function() {
+  window.closeWatchAuthPrompt();
+  window.closeAuthModal();
+
+  if (window._pendingWatchAction) {
+    const pending = window._pendingWatchAction;
+    window._pendingWatchAction = null;
+
+    if (pending.type === "watch") {
+      setTimeout(() => {
+        window.watchEpisode(pending.fid, pending.idx !== undefined ? pending.idx : 0);
+      }, 250);
+      return;
+    } else if (pending.type === "episodes") {
+      setTimeout(() => {
+        window.openEpisodesPage(pending.fid);
+      }, 250);
+      return;
+    }
+  }
+
+  if (currentPage === "account") {
+    renderAccountPage();
+  } else if (currentPage === "details" && window._lastDetailsFid) {
+    window.renderDetailsPage(window._lastDetailsFid);
+  } else {
+    showPage("home");
+  }
+};
+
 // Native input focus tracker to protect IME and Autofill from system bars re-hiding
 let nativeInputFocusTimer = null;
 window._isAnyInputActiveFlag = false;
@@ -5564,8 +5675,7 @@ window.handleAuthLoginSubmit = async function(e) {
 
   try {
     const cred = await signInWithEmailAndPassword(auth, email, password);
-    closeAuthModal();
-    showPage("home");
+    window.handlePostAuthSuccess();
   } catch (err) {
     console.error("Login error:", err);
     showAuthAlert(mapAuthErrorCodeToArabic(err));
@@ -5606,8 +5716,7 @@ window.handleAuthRegisterSubmit = async function(e) {
     if (cred.user) {
       await updateProfile(cred.user, { displayName: name });
     }
-    closeAuthModal();
-    showPage("home");
+    window.handlePostAuthSuccess();
   } catch (err) {
     console.error("Register error:", err);
     showAuthAlert(mapAuthErrorCodeToArabic(err));
@@ -5638,8 +5747,7 @@ window.handleGoogleSignInClick = async function() {
 
     try {
       await signInWithPopup(auth, provider);
-      closeAuthModal();
-      showPage("home");
+      window.handlePostAuthSuccess();
     } catch (err) {
       console.error("Google sign in error:", err);
       showAuthAlert(mapAuthErrorCodeToArabic(err));
@@ -5667,8 +5775,7 @@ window.onNativeGoogleSignInSuccess = async function(idToken) {
     const userCredential = await signInWithCredential(auth, credential);
     console.log("Firebase Google Sign-In success for:", userCredential?.user?.email);
     clearAuthAlert();
-    closeAuthModal();
-    showPage("home");
+    window.handlePostAuthSuccess();
   } catch (err) {
     console.error("Firebase native credential sign-in error:", err);
     if (btn) btn.disabled = false;
@@ -5771,6 +5878,7 @@ window.logoutApp = async function() {
     } catch (e) {
       console.warn("Sign out error:", e);
     }
+    window._pendingWatchAction = null;
     clearUserRole();
     historyStack = [];
     showPage("home");
@@ -5782,6 +5890,11 @@ window.handleAppBack = function() {
   const active = document.activeElement;
   if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) {
     active.blur();
+    return true;
+  }
+  const watchOverlay = document.getElementById("watchAuthModalOverlay");
+  if (watchOverlay && watchOverlay.classList.contains("active")) {
+    window.closeWatchAuthPrompt();
     return true;
   }
   if (window.isDrawerOpen) {
@@ -7150,6 +7263,12 @@ window.handleDetailsWatchClick = function(fid) {
   let isMovie = (item.category === "فيلم" || item.category === "فلم" || item.type === "movies");
   let episodes = Array.isArray(item.episodes) ? item.episodes : (item.video || item.altUrl ? [{ title: "الحلقة 1", video: item.video || "", altUrl: item.altUrl || "" }] : []);
 
+  // Mandatory login verification before watching anime, animation, or movie
+  if (!window.isUserLoggedIn()) {
+    window.showWatchAuthPrompt(fid, { type: isMovie ? "watch" : "episodes", fid: fid, idx: 0 });
+    return;
+  }
+
   if (isMovie) {
     let hasMovieLink = Boolean((item.video || "").trim() || (item.altUrl || "").trim() || (episodes.length > 0 && (episodes[0].video || episodes[0].altUrl)));
     if (hasMovieLink) {
@@ -7169,6 +7288,13 @@ window.handleDetailsWatchClick = function(fid) {
 window.openEpisodesPage = function(fid) {
   let item = getItemByFirebaseId(fid);
   if (!item) return;
+
+  // Mandatory login verification before opening episodes list
+  if (!window.isUserLoggedIn()) {
+    window.showWatchAuthPrompt(fid, { type: "episodes", fid: fid });
+    return;
+  }
+
   window._lastDetailsFid = fid;
   navigateTo("episodes", () => {
     window.renderEpisodesPage(fid);
@@ -7479,6 +7605,15 @@ window.renderEpisodesPage = function(fid) {
 };
 
 window.watchEpisode=(fid,idx)=>{
+  let item=getItemByFirebaseId(fid);
+  if(!item)return;
+
+  // Mandatory login verification before watching episode or playing video
+  if (!window.isUserLoggedIn()) {
+    window.showWatchAuthPrompt(fid, { type: "watch", fid: fid, idx: idx !== undefined ? idx : 0 });
+    return;
+  }
+
   if (window.currentWatchingEpisode.htmlVideoInterval) {
     clearInterval(window.currentWatchingEpisode.htmlVideoInterval);
     window.currentWatchingEpisode.htmlVideoInterval = null;
@@ -7486,7 +7621,6 @@ window.watchEpisode=(fid,idx)=>{
   window.currentWatchingEpisode.fid = fid;
   window.currentWatchingEpisode.idx = idx;
 
-  let item=getItemByFirebaseId(fid);
   if (item && window.recordWatchHistory) { window.recordWatchHistory(item, idx); }
   if(!item)return;
   let episodes = (item.episodes && item.episodes.length > 0) ? item.episodes : [{ title: t("live_stream"), video: item.video || "", altUrl: item.altUrl || "" }];
