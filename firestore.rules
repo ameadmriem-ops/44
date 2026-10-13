@@ -26,10 +26,24 @@ service cloud.firestore {
       );
     }
     
-    // Movies / Anime / Episodes: Publicly readable, writeable only by Admin
+    // User Rating on Movies/Content: Exactly one document per user per movie
+    match /movies/{movieId}/ratings/{userId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() && request.auth.uid == userId &&
+        (request.resource.data.score is int || request.resource.data.score is float) &&
+        request.resource.data.score >= 1 &&
+        request.resource.data.score <= 10;
+      allow delete: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // Movies / Anime / Episodes: Publicly readable, writeable only by Admin or rating counter update
     match /movies/{movieId} {
       allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        isAuthenticated() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratingAverage', 'ratingCount', 'ratingSum', 'views'])
+      );
     }
     
     // Sub-collections under movies if any

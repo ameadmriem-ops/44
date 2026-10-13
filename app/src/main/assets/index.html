@@ -2665,6 +2665,161 @@ body.light-mode .account-stat-val {
   box-shadow: 0 2px 10px rgba(229, 9, 20, 0.4);
 }
 
+/* Rating System Styles */
+.details-rating-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #15151c, #101015);
+  border: 1px solid #262633;
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin: 12px 0 4px 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.details-rating-banner:hover {
+  border-color: #facc15;
+  background: linear-gradient(135deg, #1a1a24, #14141c);
+}
+.rating-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.rating-big-score {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.rating-star-icon {
+  font-size: 20px;
+}
+.rating-score-num {
+  font-size: 22px;
+  font-weight: 900;
+  color: #facc15;
+}
+.rating-score-max {
+  font-size: 12px;
+  color: #71717a;
+}
+.rating-stats-text {
+  text-align: right;
+}
+.rating-stat-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+}
+.rating-stat-count {
+  font-size: 11px;
+  color: #a1a1aa;
+}
+.rate-now-action-btn {
+  background: #1f1f2a;
+  color: #facc15;
+  border: 1px solid #3f3f50;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+.rate-now-action-btn:hover {
+  background: #facc15;
+  color: #000;
+  border-color: #facc15;
+}
+.details-meta-pill.rating-pill {
+  background: rgba(250, 204, 21, 0.12);
+  color: #facc15;
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.details-meta-pill.rating-pill:hover {
+  background: rgba(250, 204, 21, 0.25);
+  border-color: #facc15;
+}
+.poster-rating-badge {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  z-index: 3;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(4px);
+  color: #facc15;
+  border: 1px solid rgba(250, 204, 21, 0.4);
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.rating-buttons-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  direction: ltr;
+}
+.rating-pill-btn {
+  background: #18181f;
+  border: 1px solid #2d2d38;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  padding: 10px 0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rating-pill-btn:hover {
+  background: #252530;
+  border-color: #facc15;
+}
+.rating-pill-btn.selected {
+  background: linear-gradient(135deg, #eab308, #ca8a04);
+  color: #000;
+  border-color: #fef08a;
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(234, 179, 8, 0.4);
+}
+.rating-toast-notification {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: #101014;
+  color: #fff;
+  border: 1px solid #22c55e;
+  padding: 12px 20px;
+  border-radius: 30px;
+  font-size: 13.5px;
+  font-weight: 800;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+.rating-toast-notification.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
 </style>
 <script type="importmap">{"imports":{"firebase/app":"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js","firebase/firestore":"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js","firebase/auth":"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js"}}</script>
 </head>
@@ -2855,7 +3010,7 @@ body.light-mode .account-stat-val {
         🎬
       </div>
 
-      <h3 style="font-size:20px;font-weight:900;color:#fff;margin-bottom:8px">تسجيل الدخول مطلوب للمشاهدة</h3>
+      <h3 id="watchAuthModalTitle" style="font-size:20px;font-weight:900;color:#fff;margin-bottom:8px">تسجيل الدخول مطلوب للمشاهدة</h3>
       
       <p id="watchAuthModalMessage" style="font-size:13.5px;color:#aaa;line-height:1.6;margin-bottom:22px">
         لمشاهدة هذا العمل والاستمتاع بجميع الحلقات، يرجى تسجيل الدخول بحسابك أو إنشاء حساب جديد مجاناً.
@@ -2878,6 +3033,62 @@ body.light-mode .account-stat-val {
       </div>
     </div>
   </div>
+
+  <!-- Real-time Rating System Modal -->
+  <div id="ratingModalOverlay" class="auth-modal-overlay" onclick="window.handleRatingOverlayClick(event)">
+    <div class="auth-modal-card" style="max-width:440px;text-align:center;padding:24px 20px" onclick="event.stopPropagation()">
+      <button type="button" class="auth-modal-close" onclick="window.closeRatingModal()" title="إغلاق">✕</button>
+      
+      <div style="width:62px;height:62px;margin:0 auto 12px auto;border-radius:18px;background:linear-gradient(135deg,rgba(250,204,21,0.22),rgba(234,179,8,0.08));border:1px solid rgba(250,204,21,0.4);display:flex;align-items:center;justify-content:center;font-size:28px">
+        ⭐
+      </div>
+
+      <h3 id="ratingModalTitle" style="font-size:19px;font-weight:900;color:#fff;margin-bottom:4px">تقييم العمل</h3>
+      <p id="ratingModalSubtitle" style="font-size:12.5px;color:#a1a1aa;margin-bottom:16px">اختر تقييمك من 1 إلى 10 وشاركه مع جميع المتابعين</p>
+
+      <!-- Live Average and Total Votes Stats Box -->
+      <div style="background:#15151c;border:1px solid #262633;border-radius:12px;padding:12px 16px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-around">
+        <div>
+          <div style="font-size:11px;color:#888;margin-bottom:3px">متوسط التقييم العام</div>
+          <div style="font-size:19px;font-weight:900;color:#facc15" id="ratingModalAvgScore">⭐ - / 10</div>
+        </div>
+        <div style="width:1px;height:30px;background:#272733"></div>
+        <div>
+          <div style="font-size:11px;color:#888;margin-bottom:3px">إجمالي المقيمين</div>
+          <div style="font-size:16px;font-weight:800;color:#fff" id="ratingModalVotesCount">0 تقييم</div>
+        </div>
+      </div>
+
+      <div style="font-size:13.5px;font-weight:800;color:#e4e4e7;margin-bottom:10px;text-align:right">
+        اختر درجة تقييمك (من 1 إلى 10):
+      </div>
+
+      <!-- 10 Rating Buttons Grid -->
+      <div class="rating-buttons-grid" id="ratingScoreButtonsGrid"></div>
+
+      <!-- Selected Score Indicator & Meaning -->
+      <div id="ratingSelectedScoreLabel" style="font-size:14.5px;font-weight:800;color:#facc15;min-height:24px;margin:12px 0 6px 0"></div>
+
+      <!-- Previous Rating or Status Notice -->
+      <div id="ratingPreviousNotice" style="font-size:12px;color:#9ca3af;min-height:18px;margin-bottom:14px"></div>
+
+      <!-- Error Message & Retry Container -->
+      <div id="ratingModalErrorWrap" style="display:none;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.35);color:#fca5a5;padding:10px 12px;border-radius:10px;font-size:12.5px;margin-bottom:14px;text-align:right"></div>
+
+      <div style="display:flex;gap:10px;margin-top:6px">
+        <button type="button" id="submitRatingBtn" class="auth-btn-primary" style="flex:1;margin:0;padding:13px;font-size:14.5px;display:flex;align-items:center;justify-content:center;gap:8px" onclick="window.submitUserRating()">
+          <span>⭐</span>
+          <span id="submitRatingBtnText">حفظ التقييم</span>
+        </button>
+
+        <button type="button" style="background:#1f1f23;color:#aaa;border:1px solid #333;padding:13px 18px;border-radius:12px;font-size:13.5px;font-weight:700;cursor:pointer" onclick="window.closeRatingModal()">
+          إلغاء
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="ratingToastNotification" class="rating-toast-notification"></div>
 
 
   <!-- Daily 5-Ads AdMob Support Dialog -->
@@ -3384,6 +3595,7 @@ window.isDrawerOpen = false;
 window.isAuthModalOpen = false;
 window.myList = JSON.parse(localStorage.getItem("my_list") || "[]");
 window.watchHistory = JSON.parse(localStorage.getItem("watch_history") || "[]");
+window.userRatings = JSON.parse(localStorage.getItem("user_ratings_cache") || "{}");
 
 
 // Android TV D-Pad Remote Control Navigation Listener
@@ -5413,15 +5625,42 @@ window.isUserLoggedIn = function() {
 };
 
 window.showWatchAuthPrompt = function(fid, pendingAction) {
+  window._pendingRatingFid = null;
   window._pendingWatchAction = pendingAction || { type: "episodes", fid: fid };
   const overlay = document.getElementById("watchAuthModalOverlay");
+  const titleEl = document.getElementById("watchAuthModalTitle");
   const msgEl = document.getElementById("watchAuthModalMessage");
   const item = getItemByFirebaseId(fid);
+  if (titleEl) {
+    titleEl.textContent = "تسجيل الدخول مطلوب للمشاهدة";
+  }
   if (msgEl) {
     if (item && item.title) {
       msgEl.innerHTML = `لمشاهدة عمل <b style="color:#00d2ff">«${window.escapeDescHtml(item.title)}»</b> والاستمتاع بجميع الحلقات، يرجى تسجيل الدخول بحسابك أو إنشاء حساب جديد مجاناً.`;
     } else {
       msgEl.textContent = "لمشاهدة هذا العمل والاستمتاع بجميع الحلقات، يرجى تسجيل الدخول بحسابك أو إنشاء حساب جديد مجاناً.";
+    }
+  }
+  if (overlay) {
+    overlay.classList.add("active");
+  }
+};
+
+window.showRatingAuthPrompt = function(fid) {
+  window._pendingWatchAction = null;
+  window._pendingRatingFid = fid;
+  const overlay = document.getElementById("watchAuthModalOverlay");
+  const titleEl = document.getElementById("watchAuthModalTitle");
+  const msgEl = document.getElementById("watchAuthModalMessage");
+  const item = getItemByFirebaseId(fid);
+  if (titleEl) {
+    titleEl.textContent = "تسجيل الدخول مطلوب للتقييم ⭐";
+  }
+  if (msgEl) {
+    if (item && item.title) {
+      msgEl.innerHTML = `لتقييم عمل <b style="color:#facc15">«${window.escapeDescHtml(item.title)}»</b> والمشاركة برأيك مع جميع المتابعين، يرجى تسجيل الدخول بحسابك أو إنشاء حساب جديد مجاناً.`;
+    } else {
+      msgEl.textContent = "لتقييم هذا العمل والمشاركة برأيك مع المتابعين، يرجى تسجيل الدخول بحسابك أو إنشاء حساب جديد مجاناً.";
     }
   }
   if (overlay) {
@@ -5450,6 +5689,20 @@ window.continueToAuthFromGate = function(tab) {
 window.handlePostAuthSuccess = function() {
   window.closeWatchAuthPrompt();
   window.closeAuthModal();
+
+  if (window._pendingRatingFid) {
+    const pendingRatingFid = window._pendingRatingFid;
+    window._pendingRatingFid = null;
+    if (currentPage !== "details" || window._lastDetailsFid !== pendingRatingFid) {
+      window.openDetails(pendingRatingFid);
+    }
+    setTimeout(() => {
+      if (window.openRatingModal) {
+        window.openRatingModal(pendingRatingFid);
+      }
+    }, 350);
+    return;
+  }
 
   if (window._pendingWatchAction) {
     const pending = window._pendingWatchAction;
@@ -6373,6 +6626,9 @@ onSnapshot(q,(s)=>{
     return {
       firebaseId: d.id,
       ...data,
+      ratingAverage: (data.ratingAverage !== undefined && data.ratingAverage !== null) ? Number(data.ratingAverage) : 0,
+      ratingCount: (data.ratingCount !== undefined && data.ratingCount !== null) ? Number(data.ratingCount) : 0,
+      ratingSum: (data.ratingSum !== undefined && data.ratingSum !== null) ? Number(data.ratingSum) : 0,
       genres: genres,
       version: (data.version || "").trim(),
       trailerUrl: (data.trailerUrl || data.trailer || "").trim(),
@@ -6385,6 +6641,13 @@ onSnapshot(q,(s)=>{
     setTimeout(() => {
       window.handleFcmNotification(pending);
     }, 120);
+  }
+  if (currentPage === "details" && window._lastDetailsFid && window.updateDetailsRatingDisplay) {
+    const currItem = getItemByFirebaseId(window._lastDetailsFid);
+    if (currItem) {
+      const userScore = (window.userRatings && window.userRatings[currItem.firebaseId]) || null;
+      window.updateDetailsRatingDisplay(currItem.firebaseId, currItem.ratingAverage, currItem.ratingCount, userScore);
+    }
   }
   if (window.currentUserRole) {
     if (window.isTypingOrInputActive && window.isTypingOrInputActive()) {
@@ -6475,6 +6738,7 @@ window.createCard = (item) => {
         <img class="poster" data-poster-fid="${item.firebaseId}" src="${item.poster || 'https://images.unsplash.com/photo-1536240478700-b869070f9279?w=400'}" alt="${window.escapeDescHtml(item.title || '')}" loading="lazy" decoding="async">
         <span class="poster-red-badge">${window.escapeDescHtml(redBadge)}</span>
         ${versionBadgeHtml}
+        ${window.getItemRatingBadgeHtml(item)}
       </div>
       <h3 title="${window.escapeDescHtml(item.title || '')}">${window.escapeDescHtml(item.title || '')}</h3>
       <p>${window.escapeDescHtml(metaText)}</p>
@@ -6482,6 +6746,16 @@ window.createCard = (item) => {
     </div>
   `;
 };
+
+window.getItemRatingBadgeHtml = function(item) {
+  if (!item) return "";
+  let avg = Number(item.ratingAverage) || 0;
+  if (avg > 0) {
+    return `<span class="poster-rating-badge">⭐ ${avg.toFixed(1)}</span>`;
+  }
+  return "";
+};
+
 window.getOfficialAnimeList = function() {
   let list = window.allContent.filter(x => {
     return x.type === "anime" || x.type === "foreign" || x.type === "news" || x.type === "entertainment";
@@ -6613,6 +6887,7 @@ window.renderHome = () => {
         <div class="home-card-poster-wrap">
           <img src="${item.poster}" alt="${window.escapeDescHtml(item.title)}" loading="lazy">
           <span class="home-card-badge">${window.escapeDescHtml(epBadge)}</span>
+          ${window.getItemRatingBadgeHtml(item)}
         </div>
         <div class="home-card-title">${window.escapeDescHtml(item.title)}</div>
         <div class="home-card-sub">${window.escapeDescHtml(catLabel)} • ${item.year || ""}</div>
@@ -6630,6 +6905,7 @@ window.renderHome = () => {
         <div class="home-card-poster-wrap">
           <img src="${item.poster}" alt="${window.escapeDescHtml(item.title)}" loading="lazy">
           <span class="home-card-badge" style="background:rgba(0,180,240,0.92);color:#000;font-weight:900">${item.year || 2024}</span>
+          ${window.getItemRatingBadgeHtml(item)}
         </div>
         <div class="home-card-title">${window.escapeDescHtml(item.title)}</div>
         <div class="home-card-sub">${window.escapeDescHtml(catLabel)} ${item.version ? `• ${item.version}` : ''}</div>
@@ -6669,6 +6945,7 @@ window.renderHome = () => {
         <div class="home-card-poster-wrap">
           <img src="${item.poster}" alt="${window.escapeDescHtml(item.title)}" loading="lazy">
           <span class="home-card-rank-badge" style="${rankBadgeStyle}">${rankText}</span>
+          ${window.getItemRatingBadgeHtml(item)}
         </div>
         <div class="home-card-title">${window.escapeDescHtml(item.title)}</div>
         <div class="home-card-sub">${window.escapeDescHtml(catLabel)} • ${item.year || ""}</div>
@@ -7137,6 +7414,39 @@ window.renderDetailsPage = function(fid) {
     `;
   }
 
+  // Rating calculation and UI
+  let avgRating = Number(item.ratingAverage) || 0;
+  let countRating = Number(item.ratingCount) || 0;
+  let cachedUserScore = (window.userRatings && window.userRatings[item.firebaseId]) || null;
+  let avgText = (avgRating > 0) ? avgRating.toFixed(1) : (item.rating ? Number(item.rating).toFixed(1) : "-");
+  let countText = (countRating > 0) ? `بناءً على ${countRating} تقييماً` : "كن أول من يقيّم هذا العمل!";
+  let userScoreText = cachedUserScore ? `✏️ تقييمك: ${cachedUserScore}/10` : "⭐ قيّم الآن";
+
+  let ratingPillHtml = `
+    <span id="detailsRatingMetaPill" class="details-meta-pill rating-pill" onclick="window.openRatingModal('${item.firebaseId}')" title="تقييم العمل">
+      ⭐ ${avgText}/10 ${countRating > 0 ? `(${countRating})` : ''}
+    </span>
+  `;
+
+  let ratingBannerHtml = `
+    <div class="details-rating-banner" onclick="window.openRatingModal('${item.firebaseId}')" role="button" tabindex="0" title="تقييم العمل">
+      <div class="rating-banner-left">
+        <div class="rating-big-score">
+          <span class="rating-star-icon">⭐</span>
+          <span class="rating-score-num" id="detailsRatingScoreNum">${avgText}</span>
+          <span class="rating-score-max">/10</span>
+        </div>
+        <div class="rating-stats-text">
+          <div class="rating-stat-title">تقييم المتابعين</div>
+          <div class="rating-stat-count" id="detailsRatingStatCount">${countText}</div>
+        </div>
+      </div>
+      <button type="button" class="rate-now-action-btn" onclick="event.stopPropagation(); window.openRatingModal('${item.firebaseId}')">
+        <span id="detailsRateActionText">${userScoreText}</span>
+      </button>
+    </div>
+  `;
+
   main.innerHTML = `
     <div class="details-page-wrapper">
       <!-- 1. Panoramic Header Section -->
@@ -7183,6 +7493,7 @@ window.renderDetailsPage = function(fid) {
             <span class="details-meta-pill type-pill">${window.escapeDescHtml(typeLabel)}</span>
             <span class="details-meta-pill status-pill ${statusClass}">${window.escapeDescHtml(statusLabel)}</span>
             ${versionBadgeHtml}
+            ${ratingPillHtml}
           </div>
           ${(!isMovie && episodes.length > 0) ? `
             <div class="details-ep-count-hint">
@@ -7191,6 +7502,9 @@ window.renderDetailsPage = function(fid) {
           ` : ''}
         </div>
       </div>
+
+      <!-- Rating Banner Section -->
+      ${ratingBannerHtml}
 
       <!-- 3. Primary CTA & Action Buttons -->
       <div class="details-cta-section">
@@ -7249,12 +7563,322 @@ window.renderDetailsPage = function(fid) {
       ${trailerCardHtml}
     </div>
   `;
+
+  // Query user's rating from Firestore if authenticated and not in cache
+  if (window.currentAuthUser && (!window.userRatings || window.userRatings[item.firebaseId] === undefined)) {
+    getDoc(doc(db, "movies", item.firebaseId, "ratings", window.currentAuthUser.uid)).then(d => {
+      if (d.exists()) {
+        window.userRatings = window.userRatings || {};
+        window.userRatings[item.firebaseId] = Number(d.data().score);
+        try {
+          localStorage.setItem("user_ratings_cache", JSON.stringify(window.userRatings));
+        } catch(e) {}
+        const actionTextEl = document.getElementById("detailsRateActionText");
+        if (actionTextEl && window._lastDetailsFid === item.firebaseId) {
+          actionTextEl.textContent = `✏️ تقييمك: ${d.data().score}/10`;
+        }
+      }
+    }).catch(() => {});
+  }
 };
 
 window.toggleDetailsFavorite = function(id, fid) {
   window.toggleFavorite(id);
   window.renderDetailsPage(fid);
 };
+
+/* ================= Online Real-Time Rating System ================= */
+window._activeRatingFid = null;
+window._currentRatingSelectedScore = 10;
+
+window.getRatingScoreDesc = function(score) {
+  const map = {
+    1: '1 / 10 • كارثي 💔',
+    2: '2 / 10 • سيء جداً 😞',
+    3: '3 / 10 • سيء 😕',
+    4: '4 / 10 • دون المتوسط 😐',
+    5: '5 / 10 • متوسط 😐',
+    6: '6 / 10 • مقبول 🙂',
+    7: '7 / 10 • جيد 👍',
+    8: '8 / 10 • جيد جداً 😊',
+    9: '9 / 10 • ممتاز ورائع 🤩',
+    10: '10 / 10 • أسطوري وخارق 🔥'
+  };
+  return map[score] || `${score} / 10`;
+};
+
+window.renderRatingScoreButtons = function(selectedScore) {
+  const grid = document.getElementById("ratingScoreButtonsGrid");
+  const label = document.getElementById("ratingSelectedScoreLabel");
+  if (!grid) return;
+
+  selectedScore = Number(selectedScore) || 10;
+  window._currentRatingSelectedScore = selectedScore;
+
+  let btnsHtml = "";
+  for (let s = 1; s <= 10; s++) {
+    const isSelected = (s === selectedScore);
+    btnsHtml += `
+      <button type="button" class="rating-pill-btn ${isSelected ? 'selected' : ''}" onclick="window.selectRatingScore(${s})">
+        ${s} ⭐
+      </button>
+    `;
+  }
+  grid.innerHTML = btnsHtml;
+
+  if (label) {
+    label.innerHTML = window.getRatingScoreDesc(selectedScore);
+  }
+};
+
+window.selectRatingScore = function(score) {
+  window.renderRatingScoreButtons(score);
+};
+
+window.openRatingModal = async function(fid) {
+  let item = getItemByFirebaseId(fid);
+  if (!item) return;
+
+  if (!window.isUserLoggedIn()) {
+    window.showRatingAuthPrompt(fid);
+    return;
+  }
+
+  window._activeRatingFid = fid;
+  window._currentRatingSelectedScore = 10;
+
+  const overlay = document.getElementById("ratingModalOverlay");
+  const titleEl = document.getElementById("ratingModalTitle");
+  const subEl = document.getElementById("ratingModalSubtitle");
+  const avgEl = document.getElementById("ratingModalAvgScore");
+  const votesEl = document.getElementById("ratingModalVotesCount");
+  const noticeEl = document.getElementById("ratingPreviousNotice");
+  const errorWrap = document.getElementById("ratingModalErrorWrap");
+  const submitBtn = document.getElementById("submitRatingBtn");
+  const submitText = document.getElementById("submitRatingBtnText");
+
+  if (errorWrap) errorWrap.style.display = "none";
+  if (submitBtn) submitBtn.disabled = false;
+  if (submitText) submitText.textContent = "حفظ التقييم ⭐";
+
+  if (titleEl) titleEl.textContent = `تقييم «${item.title || "العمل"}»`;
+  if (subEl) subEl.textContent = "اختر تقييمك من 1 إلى 10 وشاركه مع جميع المتابعين";
+
+  let avgRating = Number(item.ratingAverage) || 0;
+  let countRating = Number(item.ratingCount) || 0;
+  if (avgEl) avgEl.textContent = avgRating > 0 ? `⭐ ${avgRating.toFixed(1)} / 10` : "⭐ - / 10";
+  if (votesEl) votesEl.textContent = countRating > 0 ? `${countRating} تقييم` : "0 تقييم";
+
+  if (noticeEl) noticeEl.textContent = "جاري التحقق من تقييمك المحفوظ...";
+
+  window.renderRatingScoreButtons(10);
+
+  if (overlay) {
+    overlay.classList.add("active");
+  }
+
+  const user = window.currentAuthUser;
+  let savedScore = (window.userRatings && window.userRatings[fid]) || null;
+
+  try {
+    if (user) {
+      const userDocSnap = await getDoc(doc(db, "movies", fid, "ratings", user.uid));
+      if (userDocSnap.exists()) {
+        savedScore = Number(userDocSnap.data().score);
+        window.userRatings = window.userRatings || {};
+        window.userRatings[fid] = savedScore;
+        try {
+          localStorage.setItem("user_ratings_cache", JSON.stringify(window.userRatings));
+        } catch(e) {}
+      }
+    }
+  } catch(e) {
+    console.warn("Could not fetch remote rating doc:", e);
+  }
+
+  if (savedScore && !isNaN(savedScore)) {
+    window._currentRatingSelectedScore = savedScore;
+    window.renderRatingScoreButtons(savedScore);
+    if (noticeEl) {
+      noticeEl.innerHTML = `<span style="color:#facc15">✓ تقييمك الحالي المحفوظ: <b>${savedScore} من 10</b></span> (يمكنك تغييره باختيار درجة جديدة ثم حفظ)`;
+    }
+    if (submitText) submitText.textContent = "تحديث تقييمي ⭐";
+  } else {
+    if (noticeEl) {
+      noticeEl.textContent = "لم تقم بتقييم هذا العمل بعد — اختر درجة من 1 إلى 10 واضغط حفظ.";
+    }
+  }
+};
+
+window.closeRatingModal = function() {
+  const overlay = document.getElementById("ratingModalOverlay");
+  if (overlay) {
+    overlay.classList.remove("active");
+  }
+  window._activeRatingFid = null;
+};
+
+window.handleRatingOverlayClick = function(e) {
+  if (e.target && e.target.id === "ratingModalOverlay") {
+    window.closeRatingModal();
+  }
+};
+
+window.submitUserRating = async function() {
+  const fid = window._activeRatingFid;
+  if (!fid) return;
+  const item = getItemByFirebaseId(fid);
+  if (!item) return;
+
+  if (!window.isUserLoggedIn()) {
+    window.closeRatingModal();
+    window.showRatingAuthPrompt(fid);
+    return;
+  }
+
+  const user = window.currentAuthUser;
+  const newScore = Number(window._currentRatingSelectedScore);
+  if (!newScore || isNaN(newScore) || newScore < 1 || newScore > 10) {
+    alert("يرجى اختيار تقييم صحيح بين 1 و 10.");
+    return;
+  }
+
+  const submitBtn = document.getElementById("submitRatingBtn");
+  const submitText = document.getElementById("submitRatingBtnText");
+  const errorWrap = document.getElementById("ratingModalErrorWrap");
+  if (errorWrap) errorWrap.style.display = "none";
+  if (submitBtn) submitBtn.disabled = true;
+  if (submitText) submitText.textContent = "⏳ جاري حفظ التقييم ومزامنة البيانات...";
+
+  try {
+    const movieRef = doc(db, "movies", fid);
+    const userRatingRef = doc(db, "movies", fid, "ratings", user.uid);
+
+    let prevScore = null;
+    try {
+      const prevDocSnap = await getDoc(userRatingRef);
+      if (prevDocSnap.exists()) {
+        prevScore = Number(prevDocSnap.data().score);
+      }
+    } catch(e) {
+      console.warn("Could not check previous score doc:", e);
+    }
+
+    // 1. Save user rating doc in subcollection (enforcing one rating per user)
+    await setDoc(userRatingRef, {
+      score: newScore,
+      userId: user.uid,
+      userEmail: user.email || "",
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+
+    // 2. Aggregate true average and count from database collection
+    let ratingCount = 0;
+    let ratingSum = 0;
+    let ratingAverage = 0;
+
+    try {
+      const ratingsColRef = collection(db, "movies", fid, "ratings");
+      const allRatingsSnap = await getDocs(ratingsColRef);
+      const scores = allRatingsSnap.docs
+        .map(d => Number(d.data()?.score))
+        .filter(s => !isNaN(s) && s >= 1 && s <= 10);
+
+      ratingCount = scores.length;
+      ratingSum = scores.reduce((a, b) => a + b, 0);
+      ratingAverage = ratingCount > 0 ? Math.round((ratingSum / ratingCount) * 10) / 10 : 0;
+    } catch (aggErr) {
+      console.warn("Could not query all ratings collection docs, computing incrementally:", aggErr);
+      let currCount = Number(item.ratingCount) || 0;
+      let currSum = Number(item.ratingSum) || (currCount * (Number(item.ratingAverage) || 0));
+      if (prevScore !== null && !isNaN(prevScore)) {
+        ratingCount = Math.max(1, currCount);
+        ratingSum = Math.max(0, currSum - prevScore + newScore);
+      } else {
+        ratingCount = currCount + 1;
+        ratingSum = currSum + newScore;
+      }
+      ratingAverage = ratingCount > 0 ? Math.round((ratingSum / ratingCount) * 10) / 10 : newScore;
+    }
+
+    // 3. Update parent movie document for live real-time sync across all devices
+    await updateDoc(movieRef, {
+      ratingAverage: ratingAverage,
+      ratingCount: ratingCount,
+      ratingSum: ratingSum
+    });
+
+    // 4. Update in-memory item & local cache
+    item.ratingAverage = ratingAverage;
+    item.ratingCount = ratingCount;
+    item.ratingSum = ratingSum;
+    window.userRatings = window.userRatings || {};
+    window.userRatings[fid] = newScore;
+    try {
+      localStorage.setItem("user_ratings_cache", JSON.stringify(window.userRatings));
+    } catch(e) {}
+
+    // 5. Close modal and show success toast
+    window.closeRatingModal();
+    window.showRatingToast(`✓ تم حفظ تقييمك (${newScore}/10) بنجاح! شكراً لمشاركتك.`);
+
+    // 6. Update UI directly on details page
+    window.updateDetailsRatingDisplay(fid, ratingAverage, ratingCount, newScore);
+
+  } catch (err) {
+    console.error("Error submitting rating:", err);
+    if (submitBtn) submitBtn.disabled = false;
+    if (submitText) submitText.textContent = "إعادة المحاولة ⭐";
+    if (errorWrap) {
+      errorWrap.style.display = "block";
+      errorWrap.innerHTML = `
+        <div style="font-weight:800;margin-bottom:4px">⚠️ تعذر حفظ التقييم:</div>
+        <div style="font-size:11.5px;color:#fca5a5">${window.escapeDescHtml(err.message || "حدث خطأ أثناء الاتصال بقاعدة البيانات.")}</div>
+        <div style="margin-top:8px">
+          <button type="button" style="background:#ef4444;color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer" onclick="window.submitUserRating()">
+            إعادة المحاولة الآن 🔄
+          </button>
+        </div>
+      `;
+    }
+  }
+};
+
+window.updateDetailsRatingDisplay = function(fid, ratingAverage, ratingCount, userScore) {
+  if (currentPage !== "details" || window._lastDetailsFid !== fid) return;
+
+  const scoreNumEl = document.getElementById("detailsRatingScoreNum");
+  const statCountEl = document.getElementById("detailsRatingStatCount");
+  const actionTextEl = document.getElementById("detailsRateActionText");
+  const ratingPillEl = document.getElementById("detailsRatingMetaPill");
+
+  const avgText = (ratingAverage > 0) ? Number(ratingAverage).toFixed(1) : "-";
+  const countText = (ratingCount > 0) ? `بناءً على ${ratingCount} تقييماً` : "كن أول من يقيّم هذا العمل!";
+
+  if (scoreNumEl) scoreNumEl.textContent = avgText;
+  if (statCountEl) statCountEl.textContent = countText;
+  if (actionTextEl) actionTextEl.textContent = userScore ? `✏️ تقييمك: ${userScore}/10` : "⭐ قيّم الآن";
+  if (ratingPillEl) {
+    ratingPillEl.innerHTML = `⭐ ${avgText}/10 ${ratingCount > 0 ? `(${ratingCount})` : ''}`;
+  }
+};
+
+window.showRatingToast = function(msg) {
+  let toast = document.getElementById("ratingToastNotification");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "ratingToastNotification";
+    toast.className = "rating-toast-notification";
+    document.body.appendChild(toast);
+  }
+  toast.innerHTML = `<span>⭐</span><span>${msg}</span>`;
+  toast.classList.add("show");
+  clearTimeout(window._ratingToastTimer);
+  window._ratingToastTimer = setTimeout(() => {
+    toast.classList.remove("show");
+  }, 3500);
+};
+
 
 window.handleDetailsWatchClick = function(fid) {
   let item = getItemByFirebaseId(fid);
